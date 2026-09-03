@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#8a2f2f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cash Book">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Cash Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #FAF7F0;
+    --ink: #2B2118;
+    --ink-soft: #7a6f5c;
+    --rule: #e4dcc8;
+    --margin-rule: #a13d3d;
+    --receipt: #2f6b3a;
+    --payment: #a13d3d;
+    --highlight-bg: rgba(240,195,77,0.28);
+    --card: #ffffff;
+    --shadow: rgba(43,33,24,0.10);
+    --accent: #8a2f2f;
+    --accent-light: #b5651d;
+  }
+  html{ color-scheme: light; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: linear-gradient(180deg, #FDFBF6 0%, #F7F1E4 100%) !important;
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    min-height: 100vh;
+    padding-bottom: 40px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap{ position: relative; z-index: 1; max-width: 560px; margin: 0 auto; padding: 0 16px; }
+  header{
+    display:flex; align-items:center; justify-content: space-between; gap:8px;
+    background: linear-gradient(120deg, var(--accent) 0%, #6e2323 100%);
+    margin: 0 -16px 16px -16px;
+    padding: 20px 16px 18px 16px;
+    border-radius: 0 0 18px 18px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  h1{ font-family:'Fraunces', serif; font-weight:700; font-size: 24px; margin:0; letter-spacing: -0.01em; color:#fff; }
+  .hdr-btns{ display:flex; gap:6px; flex-shrink:0; }
+  .hdr-btn{ background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-family:'Inter'; font-size: 12px; padding: 6px 10px; border-radius: 20px; cursor:pointer; white-space:nowrap; }
+  .whoami{ display:flex; align-items:center; gap:6px; font-size: 12px; color: var(--ink-soft); padding: 2px 0 14px 0; }
+  .badge{ display:inline-flex; align-items:center; justify-content:center; width: 18px; height: 18px; border-radius: 50%; color:#fff; font-size: 10px; font-weight:700; font-family:'Inter'; flex-shrink:0; }
+  .datebar{ display:flex; align-items:center; justify-content:space-between; padding: 10px 0 14px 0; border-bottom: 2px solid var(--ink); }
+  .datebar button{ background:none; border:none; font-size: 22px; color: var(--ink); cursor:pointer; padding: 4px 10px; line-height:1; }
+  .datebar .datelabel{ font-family:'Fraunces', serif; font-size: 18px; font-weight: 600; text-align:center; flex:1; }
+  .datebar .datelabel small{ display:block; font-family:'Inter'; font-weight:400; font-size: 12px; color: var(--ink-soft); margin-top:1px; }
+  .closed-badge{ display:inline-block; font-size: 11px; background: var(--ink); color: var(--paper); padding: 2px 7px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+
+  .section-title{ font-family:'Fraunces', serif; font-weight:600; font-size: 14.5px; color: var(--ink-soft); margin: 18px 0 8px 0; }
+
+  .dash-strip{ display:flex; gap:10px; margin-bottom: 16px; }
+  .dash-card{
+    flex:1; background: var(--card); border-radius: 14px; padding: 12px 14px;
+    box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--rule);
+  }
+  .dash-card .dl{ font-size: 10.5px; text-transform:uppercase; letter-spacing:.04em; color: var(--ink-soft); font-weight:600; margin-bottom:4px; }
+  .dash-card .dv{ font-family:'Fraunces', serif; font-weight:700; font-size: 19px; color: var(--ink); }
+  .dash-banner{
+    display:flex; align-items:center; gap:8px;
+    padding: 10px 14px; border-radius: 12px; margin-bottom: 18px;
+    font-size: 13px; font-weight:600;
+  }
+  .dash-banner.ok{ background: linear-gradient(120deg, #e4f2e7, #d6eadd); color: var(--receipt); }
+  .dash-banner.bad{ background: linear-gradient(120deg, #f7e6e6, #f3d3d3); color: var(--payment); }
+  .dash-banner.pending{ background: #f2ede0; color: var(--ink-soft); }
+
+  .open-row{ display:flex; align-items:center; justify-content:space-between; padding: 8px 2px; border-bottom: 1px solid var(--rule); }
+  .open-row .who{ display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; }
+  .open-row .amt{ font-family:'IBM Plex Mono', monospace; font-weight:600; }
+  .open-row input{ font-family:'IBM Plex Mono', monospace; font-size:15px; width: 120px; text-align:right; border:none; border-bottom: 1px dashed var(--ink-soft); background:transparent; color:var(--ink); padding:2px 0; }
+
+  .entries{ padding: 6px 0 10px 0; }
+  .entry{ display:flex; align-items:flex-start; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--rule); position: relative; }
+  .entry.important{ background: var(--highlight-bg); box-shadow: inset 3px 0 0 var(--margin-rule); border-radius: 2px; }
+  .entry .time{ font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); width: 40px; padding-top: 3px; flex-shrink:0; }
+  .entry .by{ padding-top: 1px; flex-shrink:0; }
+  .entry .particulars{ flex:1; font-size: 14.5px; line-height:1.4; padding-top: 1px; }
+  .entry .amt{ font-family:'IBM Plex Mono', monospace; font-weight: 600; font-size: 14.5px; white-space: nowrap; padding-top: 1px; }
+  .entry .amt.receipt{ color: var(--receipt); }
+  .entry .amt.payment{ color: var(--payment); }
+  .entry .del{ background:none; border:none; color: var(--ink-soft); font-size: 15px; cursor:pointer; padding: 0 2px; flex-shrink:0; }
+  .empty-note{ text-align:center; color: var(--ink-soft); font-size: 13.5px; padding: 22px 10px; font-style: italic; }
+
+  .totals{ margin-top: 4px; border-top: 2px solid var(--ink); padding-top: 10px; }
+  .totals .line{ display:flex; justify-content:space-between; padding: 5px 0; font-size: 14px; }
+  .totals .line.strong{ font-family:'Fraunces', serif; font-weight:700; font-size: 16px; border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 9px; }
+  .totals .amt-in{ color: var(--receipt); font-family:'IBM Plex Mono',monospace; }
+  .totals .amt-out{ color: var(--payment); font-family:'IBM Plex Mono',monospace; }
+  .totals .amt{ font-family:'IBM Plex Mono',monospace; }
+
+  .status-banner{
+    margin-top: 12px; padding: 10px 12px; border-radius: 6px; font-size: 13.5px; font-weight:600; text-align:center;
+  }
+  .status-banner.ok{ background: rgba(47,107,58,0.14); color: var(--receipt); }
+  .status-banner.bad{ background: rgba(161,61,61,0.14); color: var(--payment); }
+  .status-banner.pending{ background: var(--card); color: var(--ink-soft); border: 1px solid var(--rule); }
+
+  .person-card{ background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 12px 14px; margin-top: 10px; box-shadow: 0 1px 3px var(--shadow); }
+  .person-card .ph{ display:flex; align-items:center; gap:8px; font-family:'Fraunces', serif; font-weight:600; font-size: 15px; margin-bottom: 8px; }
+  .person-card .line{ display:flex; justify-content:space-between; align-items:center; padding: 5px 0; font-size: 13.5px; }
+  .person-card input{ font-family:'IBM Plex Mono', monospace; font-size: 14.5px; width: 120px; text-align:right; border: 1px solid var(--rule); border-radius: 4px; background: #fff; padding: 5px 8px; }
+  .diff-ok{ color: var(--receipt); font-weight:700; }
+  .diff-bad{ color: var(--payment); font-weight:700; }
+  .closed-by-note{ font-size:12px; color:var(--ink-soft); margin-top:8px; font-style:italic; text-align:center; }
+
+  .addform{ margin-top: 16px; background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 14px; box-shadow: 0 1px 3px var(--shadow); }
+  .addform-title{ font-family:'Fraunces', serif; font-weight:600; font-size: 14px; color: var(--ink-soft); margin-bottom: 10px; }
+  .seg{ display:flex; border: 1px solid var(--ink); border-radius: 5px; overflow:hidden; margin-bottom: 10px; }
+  .seg button{ flex:1; padding: 9px 0; border:none; background: transparent; font-family:'Inter'; font-weight:600; font-size: 13.5px; color: var(--ink); cursor:pointer; }
+  .seg button.active.in{ background: var(--receipt); color:#fff; }
+  .seg button.active.out{ background: var(--payment); color:#fff; }
+  .addform input[type=text]{ width:100%; font-family:'Inter'; font-size: 15px; padding: 10px 10px; border: 1px solid var(--rule); border-radius: 5px; margin-bottom: 8px; background:#fff; color: var(--ink); }
+  .amtrow{ display:flex; gap:8px; align-items:center; }
+  .amtrow input[type=number]{ flex:1; font-family:'IBM Plex Mono', monospace; font-size: 16px; padding: 10px 10px; border: 1px solid var(--rule); border-radius: 5px; background:#fff; color: var(--ink); }
+  .star-toggle{ width: 42px; height: 42px; border-radius: 5px; border: 1px solid var(--rule); background: #fff; font-size: 18px; cursor: pointer; flex-shrink:0; }
+  .star-toggle.on{ background: #f0c34d; border-color: #f0c34d; }
+  .add-btn{ width:100%; margin-top: 10px; padding: 12px 0; background: var(--ink); color: var(--paper); border:none; border-radius: 5px; font-family:'Inter'; font-weight:600; font-size: 15px; cursor:pointer; }
+
+  .actions{ display:flex; gap:8px; margin-top: 14px; }
+  .actions button{ flex:1; padding: 11px 0; border-radius: 5px; font-family:'Inter'; font-weight:600; font-size: 13.5px; cursor:pointer; border: 1px solid var(--ink); background: transparent; color: var(--ink); }
+  .actions button.primary{ background: var(--margin-rule); border-color: var(--margin-rule); color: #fff; }
+
+  .overlay{ position:fixed; inset:0; background: rgba(43,33,24,0.55); z-index: 20; display:flex; align-items:flex-end; justify-content:center; }
+  .overlay.center{ align-items:center; }
+  .overlay.hidden{ display:none; }
+  .sheet{ background: var(--paper); width:100%; max-width: 560px; max-height: 82vh; overflow-y:auto; border-radius: 14px 14px 0 0; padding: 16px 16px 26px 16px; }
+  .overlay.center .sheet{ border-radius: 14px; max-height: 88vh; }
+  .sheet h2{ font-family:'Fraunces', serif; font-size: 19px; margin: 4px 0 12px 0; }
+  .sheet p.sub{ font-size: 13px; color: var(--ink-soft); margin: -8px 0 16px 0; }
+  .hist-row{ display:flex; justify-content:space-between; padding: 10px 4px; border-bottom: 1px solid var(--rule); font-size: 13.5px; cursor:pointer; }
+  .hist-row .d{ font-weight:600; }
+  .hist-row .s{ color: var(--ink-soft); font-size:12px; }
+  .hist-row .c{ font-family:'IBM Plex Mono', monospace; text-align:right; }
+  .close-sheet{ display:block; margin: 14px auto 0 auto; background:none; border: 1px solid var(--ink); padding: 8px 20px; border-radius: 5px; font-family:'Inter'; cursor:pointer; }
+  .toast{ position:fixed; bottom: 20px; left:50%; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 18px; border-radius: 20px; font-size: 13px; z-index: 40; opacity:0; transition: opacity 0.25s; pointer-events:none; white-space:nowrap; text-align:center; max-width:85vw; }
+  .toast.show{ opacity:1; }
+  .locked-note{ text-align:center; font-size: 12.5px; color: var(--ink-soft); padding: 10px 0 0 0; font-style: italic; }
+
+  .login-wrap{ text-align:center; padding: 8px 4px 4px 4px; }
+  .login-wrap .lock-icon{ font-size: 34px; margin-bottom: 6px; }
+  .pin-display{ display:flex; justify-content:center; gap: 12px; margin: 18px 0; }
+  .pin-dot{ width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ink); background: transparent; }
+  .pin-dot.filled{ background: var(--ink); }
+  .keypad{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 260px; margin: 0 auto; }
+  .keypad button{ padding: 16px 0; font-size: 20px; font-family:'IBM Plex Mono', monospace; border-radius: 8px; border: 1px solid var(--rule); background:#fff; color: var(--ink); cursor:pointer; }
+  .keypad button.wide{ font-size: 14px; font-family:'Inter'; }
+  .setup-user-row{ display:flex; align-items:center; gap:8px; padding: 8px 4px; border-bottom: 1px solid var(--rule); }
+  .setup-user-row .dot{ width:14px;height:14px;border-radius:50%;flex-shrink:0; }
+  .setup-user-row .name{ flex:1; font-size:14px; font-weight:600; }
+  .setup-user-row .rm{ background:none;border:none;color:var(--ink-soft);font-size:14px;cursor:pointer; }
+  .addperson{ background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 12px; margin-top:12px; }
+  .addperson input{ width:100%; font-family:'Inter'; font-size:14px; padding:9px; border:1px solid var(--rule); border-radius:5px; margin-bottom:8px; background:#fff; }
+  .addperson input.pin{ font-family:'IBM Plex Mono', monospace; letter-spacing: 4px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap" id="mainApp" style="display:none;">
+  <header>
+    <h1>Cash Book</h1>
+    <div class="hdr-btns">
+      <button class="hdr-btn" onclick="openExport()">Export</button>
+      <button class="hdr-btn" onclick="openHistory()">History</button>
+      <button class="hdr-btn" onclick="openUsers()">People</button>
+    </div>
+  </header>
+  <div class="whoami" id="whoami"></div>
+
+  <div class="dash-strip" id="dashStrip"></div>
+  <div id="dashBanner"></div>
+
+  <div class="datebar">
+    <button onclick="shiftDay(-1)">‹</button>
+    <div class="datelabel"><span id="dateMain">—</span><small id="dateSub"></small></div>
+    <button onclick="shiftDay(1)">›</button>
+  </div>
+
+  <div class="section-title">Opening Cash (each person)</div>
+  <div id="openingsList"></div>
+
+  <div class="section-title">Today's Entries</div>
+  <div class="entries" id="entriesList"></div>
+  <div class="totals" id="totalsBlock"></div>
+
+  <div class="section-title">Closing — Actual vs Books, by Person</div>
+  <div id="personCards"></div>
+  <div id="statusBanner"></div>
+  <div id="closedByNote"></div>
+
+  <div id="formArea"></div>
+  <div id="lockedNote"></div>
+</div>
+
+<div class="overlay center" id="loginOverlay">
+  <div class="sheet">
+    <div class="login-wrap">
+      <div class="lock-icon">🔒</div>
+      <h2 id="loginTitle">Enter your PIN</h2>
+      <p class="sub" id="loginSub">4-digit PIN to open the cash book</p>
+      <div class="pin-display" id="pinDisplay">
+        <div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div><div class="pin-dot"></div>
+      </div>
+      <div class="keypad" id="keypad"></div>
+      <p class="sub" id="loginError" style="color:var(--payment); min-height:16px; margin-top:14px;"></p>
+    </div>
+  </div>
+</div>
+
+<div class="overlay center hidden" id="setupOverlay">
+  <div class="sheet">
+    <h2>Set up your Cash Book</h2>
+    <p class="sub">Add each person who keeps their own cash — you and your father, for example. Everyone gets their own name, colour, opening balance and 4-digit PIN.</p>
+    <div id="setupUserList"></div>
+    <div class="addperson">
+      <input type="text" id="setupName" placeholder="Name (e.g. Rahul, Father)">
+      <input type="text" id="setupPin" class="pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*">
+      <button class="add-btn" onclick="setupAddPerson()">Add Person</button>
+    </div>
+    <button class="add-btn" style="margin-top:14px;" onclick="finishSetup()">Done — Start Using Cash Book</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="usersOverlay">
+  <div class="sheet">
+    <h2>People</h2>
+    <p class="sub">Everyone listed here keeps their own cash balance and can log in with their PIN.</p>
+    <div id="usersList"></div>
+    <div class="addperson">
+      <input type="text" id="addName" placeholder="Name">
+      <input type="text" id="addPin" class="pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*">
+      <button class="add-btn" onclick="addPerson()">Add Person</button>
+    </div>
+    <button class="add-btn" style="margin-top:14px; background:transparent; color:var(--ink); border:1px solid var(--ink);" onclick="switchUser()">Switch User (Log Out)</button>
+    <button class="close-sheet" onclick="closeUsers()">Close</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="historyOverlay">
+  <div class="sheet">
+    <h2>Past Days</h2>
+    <div id="historyList"></div>
+    <button class="close-sheet" onclick="closeHistory()">Close</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="exportOverlay">
+  <div class="sheet">
+    <h2>Export Cash Book</h2>
+    <p class="sub">Downloads every entry from every day, with each person's opening, closing, actual count and difference, as a CSV that opens directly in Excel.</p>
+    <button class="add-btn" onclick="doExport()">Download CSV</button>
+    <button class="close-sheet" onclick="closeExport()">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  // ====== YOUR FIREBASE CONFIG (aman-cashbook) ======
+  const firebaseConfig = {
+    apiKey: "AIzaSyArnXm8lF2xcDmt9vkI9-JNk9eRBx_Ppjw",
+    authDomain: "aman-cashbook.firebaseapp.com",
+    projectId: "aman-cashbook",
+    storageBucket: "aman-cashbook.firebasestorage.app",
+    messagingSenderId: "1092214525446",
+    appId: "1:1092214525446:web:ffcb0f214fc580c987bd87"
+  };
+  // ====================================================
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
+<script>
+const CUR = '₹';
+const PALETTE = ['#2f5fa1','#8a3fa0','#b5651d','#1f7a6c','#6b4fa0','#3a7a3a','#a05a2c','#4a5da3'];
+
+let config = null;
+let currentUser = null;
+let pinBuffer = '';
+let pendingSetupUsers = [];
+
+let state = { date: toISODate(new Date()), day: null, meta: null, form: { type:'in', particulars:'', amount:'', important:false } };
+
+function toISODate(d){ const off=d.getTimezoneOffset(); const local=new Date(d.getTime()-off*60000); return local.toISOString().slice(0,10); }
+function prettyDate(iso){
+  const d = new Date(iso + 'T12:00:00');
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return { main: days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()], sub: d.getFullYear() };
+}
+function fmt(n){ n=Number(n)||0; return CUR + n.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+function fmtSigned(n, type){ return (type==='in' ? '+' : '−') + fmt(Math.abs(n)); }
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1700); }
+function initials(name){ return (name||'?').trim().slice(0,1).toUpperCase(); }
+
+async function safeGet(key){
+  try{
+    const doc = await db.collection('cashbook').doc(key).get();
+    if(!doc.exists) return null;
+    return doc.data().value;
+  }catch(e){ console.error(e); showToast('Could not load — check connection'); return null; }
+}
+async function safeSet(key, value){
+  try{
+    await db.collection('cashbook').doc(key).set({ value: value, updatedAt: Date.now() });
+    return true;
+  }catch(e){ console.error(e); showToast('Save failed — try again'); return false; }
+}
+
+/* ---------- CONFIG / LOGIN ---------- */
+async function loadConfig(){ config = await safeGet('config'); }
+async function saveConfig(){ await safeSet('config', config); }
+
+function buildKeypad(){
+  const kp = document.getElementById('keypad');
+  let html = '';
+  for(let i=1;i<=9;i++) html += `<button onclick="pinPress('${i}')">${i}</button>`;
+  html += `<button class="wide" onclick="pinClear()">Clear</button>`;
+  html += `<button onclick="pinPress('0')">0</button>`;
+  html += `<button class="wide" onclick="pinBack()">⌫</button>`;
+  kp.innerHTML = html;
+}
+function pinPress(d){ if(pinBuffer.length>=4) return; pinBuffer += d; renderPinDots(); if(pinBuffer.length===4) setTimeout(tryPinLogin, 120); }
+function pinBack(){ pinBuffer = pinBuffer.slice(0,-1); renderPinDots(); }
+function pinClear(){ pinBuffer=''; renderPinDots(); }
+function renderPinDots(){ document.querySelectorAll('#pinDisplay .pin-dot').forEach((el,i)=> el.classList.toggle('filled', i < pinBuffer.length)); }
+async function tryPinLogin(){
+  const match = config.users.find(u => u.pin === pinBuffer);
+  if(match){ currentUser = match; document.getElementById('loginOverlay').classList.add('hidden'); document.getElementById('loginError').textContent=''; pinBuffer=''; renderPinDots(); await enterApp(); }
+  else { document.getElementById('loginError').textContent = 'PIN not recognised — try again'; pinBuffer=''; renderPinDots(); }
+}
+
+function renderSetupList(){
+  const el = document.getElementById('setupUserList');
+  el.innerHTML = pendingSetupUsers.map((u,i)=>`<div class="setup-user-row"><div class="dot" style="background:${u.color}"></div><div class="name">${escapeHtml(u.name)}</div><button class="rm" onclick="setupRemovePerson(${i})">Remove</button></div>`).join('');
+}
+function setupAddPerson(){
+  const name = document.getElementById('setupName').value.trim();
+  const pin = document.getElementById('setupPin').value.trim();
+  if(!name){ showToast('Enter a name'); return; }
+  if(!/^\d{4}$/.test(pin)){ showToast('PIN must be exactly 4 digits'); return; }
+  if(pendingSetupUsers.some(u=>u.pin===pin)){ showToast('That PIN is already used — pick another'); return; }
+  const color = PALETTE[pendingSetupUsers.length % PALETTE.length];
+  pendingSetupUsers.push({ id: 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), name, pin, color });
+  document.getElementById('setupName').value=''; document.getElementById('setupPin').value='';
+  document.getElementById('setupName').blur(); document.getElementById('setupPin').blur();
+  renderSetupList();
+  showToast(name + ' added — add another or tap Done below');
+  setTimeout(()=>{ const el = document.getElementById('setupUserList'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 150);
+}
+function setupRemovePerson(i){ pendingSetupUsers.splice(i,1); renderSetupList(); }
+async function finishSetup(){
+  if(pendingSetupUsers.length===0){ showToast('Add at least one person first'); return; }
+  config = { users: pendingSetupUsers };
+  await saveConfig();
+  document.getElementById('setupOverlay').classList.add('hidden');
+  showToast('Cash book set up');
+  showLogin();
+}
+function showLogin(){
+  document.getElementById('mainApp').style.display='none';
+  document.getElementById('loginTitle').textContent = 'Enter your PIN';
+  document.getElementById('loginSub').textContent = config.users.length + ' ' + (config.users.length===1?'person':'people') + ' set up — enter your PIN to continue';
+  buildKeypad(); pinBuffer=''; renderPinDots();
+  document.getElementById('loginOverlay').classList.remove('hidden');
+}
+function switchUser(){ currentUser = null; document.getElementById('usersOverlay').classList.add('hidden'); showLogin(); }
+
+/* ---------- USERS MANAGEMENT ---------- */
+function openUsers(){ renderUsersList(); document.getElementById('usersOverlay').classList.remove('hidden'); }
+function closeUsers(){ document.getElementById('usersOverlay').classList.add('hidden'); }
+function renderUsersList(){
+  document.getElementById('usersList').innerHTML = config.users.map(u=>`<div class="setup-user-row"><div class="dot" style="background:${u.color}"></div><div class="name">${escapeHtml(u.name)}${currentUser && currentUser.id===u.id ? ' (you)':''}</div><button class="rm" onclick="removePerson('${u.id}')">Remove</button></div>`).join('');
+}
+async function addPerson(){
+  const name = document.getElementById('addName').value.trim();
+  const pin = document.getElementById('addPin').value.trim();
+  if(!name){ showToast('Enter a name'); return; }
+  if(!/^\d{4}$/.test(pin)){ showToast('PIN must be exactly 4 digits'); return; }
+  if(config.users.some(u=>u.pin===pin)){ showToast('That PIN is already used — pick another'); return; }
+  const color = PALETTE[config.users.length % PALETTE.length];
+  config.users.push({ id: 'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), name, pin, color });
+  await saveConfig();
+  document.getElementById('addName').value=''; document.getElementById('addPin').value='';
+  renderUsersList();
+  ensureDayHasAllUsers();
+  showToast('Person added');
+}
+async function removePerson(id){
+  if(config.users.length<=1){ showToast("Can't remove the last person"); return; }
+  config.users = config.users.filter(u=>u.id!==id);
+  await saveConfig();
+  renderUsersList();
+  showToast('Removed — their past entries stay in the records');
+}
+
+/* ---------- DAY DATA ---------- */
+async function loadMeta(){ state.meta = await safeGet('meta') || { daysIndex: [], userCarry: {} }; if(!state.meta.userCarry) state.meta.userCarry = {}; }
+async function saveMeta(){ await safeSet('meta', state.meta); }
+
+function freshBalanceFor(userId){
+  const carry = state.meta.userCarry[userId];
+  return carry ? { opening: carry.balance, openingManual: false, actualCash: '' } : { opening: 0, openingManual: true, actualCash: '' };
+}
+async function loadDay(iso){
+  let day = await safeGet('day:'+iso);
+  if(!day){ day = { balances: {}, entries: [], closed: false, closedBy: null }; }
+  if(!day.balances) day.balances = {};
+  if(day.closedBy === undefined) day.closedBy = null;
+  for(const u of config.users){ if(!day.balances[u.id]) day.balances[u.id] = freshBalanceFor(u.id); }
+  return day;
+}
+function ensureDayHasAllUsers(){
+  for(const u of config.users){ if(!state.day.balances[u.id]) state.day.balances[u.id] = freshBalanceFor(u.id); }
+}
+async function saveDay(iso, day){
+  const ok = await safeSet('day:'+iso, day);
+  if(ok && !state.meta.daysIndex.includes(iso)){ state.meta.daysIndex.push(iso); state.meta.daysIndex.sort(); await saveMeta(); }
+  return ok;
+}
+function userTotals(day, userId){
+  let receipts=0, payments=0;
+  for(const e of day.entries){ if(e.by!==userId) continue; if(e.type==='in') receipts+=Number(e.amount); else payments+=Number(e.amount); }
+  const bal = day.balances[userId] || freshBalanceFor(userId);
+  const closing = Number(bal.opening) + receipts - payments;
+  return { receipts, payments, closing, opening: Number(bal.opening), actual: bal.actualCash };
+}
+function dayGrandTotals(day){
+  let receipts=0, payments=0, opening=0, closing=0, actualKnown=true, actual=0;
+  for(const u of config.users){
+    const t = userTotals(day, u.id);
+    receipts+=t.receipts; payments+=t.payments; opening+=t.opening; closing+=t.closing;
+    if(t.actual==='' || t.actual===null || t.actual===undefined) actualKnown=false; else actual+=Number(t.actual);
+  }
+  return { receipts, payments, opening, closing, actual, actualKnown };
+}
+function userById(id){ return (config.users||[]).find(u=>u.id===id) || { name:'Unknown', color:'#999' }; }
+
+async function render(){
+  document.getElementById('whoami').innerHTML = `<span class="badge" style="background:${currentUser.color}">${initials(currentUser.name)}</span> Logged in as <strong>${escapeHtml(currentUser.name)}</strong>`;
+  const pd = prettyDate(state.date);
+  document.getElementById('dateMain').textContent = pd.main;
+  document.getElementById('dateSub').innerHTML = pd.sub + (state.day.closed ? ' <span class="closed-badge">Closed</span>' : '');
+
+  // openings
+  const openingsList = document.getElementById('openingsList');
+  openingsList.innerHTML = config.users.map(u=>{
+    const bal = state.day.balances[u.id];
+    const entryCount = state.day.entries.filter(e=>e.by===u.id).length;
+    const editable = bal.openingManual && entryCount===0 && !state.day.closed;
+    return `<div class="open-row">
+      <div class="who"><span class="badge" style="background:${u.color}">${initials(u.name)}</span>${escapeHtml(u.name)}</div>
+      ${editable ? `<input type="number" inputmode="decimal" class="openInput" data-uid="${u.id}" value="${bal.opening||''}" placeholder="0">` : `<span class="amt">${fmt(bal.opening)}</span>`}
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.openInput').forEach(inp=>{
+    inp.onchange = async (e)=>{ const uid=e.target.dataset.uid; state.day.balances[uid].opening = Number(e.target.value)||0; await saveDay(state.date, state.day); render(); };
+  });
+
+  // entries
+  const list = document.getElementById('entriesList');
+  if(state.day.entries.length===0){
+    list.innerHTML = `<div class="empty-note">No entries yet for this day.</div>`;
+  } else {
+    list.innerHTML = state.day.entries.map(e => {
+      const u = userById(e.by);
+      return `<div class="entry ${e.important?'important':''}">
+        <div class="time">${e.time||''}</div>
+        <div class="by"><span class="badge" style="background:${u.color}" title="${escapeHtml(u.name)}">${initials(u.name)}</span></div>
+        <div class="particulars">${escapeHtml(e.particulars)}${e.important?' ★':''}</div>
+        <div class="amt ${e.type==='in'?'receipt':'payment'}">${fmtSigned(e.amount, e.type)}</div>
+        ${state.day.closed ? '' : `<button class="del" onclick="deleteEntry('${e.id}')">✕</button>`}
+      </div>`;
+    }).join('');
+  }
+
+  const gt = dayGrandTotals(state.day);
+  document.getElementById('totalsBlock').innerHTML = `
+    <div class="line"><span>Total Receipts (everyone)</span><span class="amt-in">${fmt(gt.receipts)}</span></div>
+    <div class="line"><span>Total Payments (everyone)</span><span class="amt-out">${fmt(gt.payments)}</span></div>
+    <div class="line strong"><span>Combined Book Closing</span><span class="amt">${fmt(gt.closing)}</span></div>
+  `;
+
+  // per-person reconciliation cards
+  const cards = document.getElementById('personCards');
+  let allMatched = true, anyMissing = false, mismatches = [];
+  cards.innerHTML = config.users.map(u=>{
+    const t = userTotals(state.day, u.id);
+    let diffHtml, rowClass='';
+    if(t.actual==='' || t.actual===null || t.actual===undefined){
+      diffHtml = `<span style="color:var(--ink-soft)">—</span>`; anyMissing = true;
+    } else {
+      const diff = Number(t.actual) - t.closing;
+      if(Math.abs(diff) < 0.005){ diffHtml = `<span class="diff-ok">Matched ✓</span>`; }
+      else { diffHtml = `<span class="diff-bad">${diff>0?'Excess':'Short'} ${fmt(Math.abs(diff))}</span>`; allMatched=false; mismatches.push(u.name + ' (' + (diff>0?'excess':'short') + ' ' + fmt(Math.abs(diff)) + ')'); }
+    }
+    return `<div class="person-card">
+      <div class="ph"><span class="badge" style="background:${u.color}">${initials(u.name)}</span>${escapeHtml(u.name)}</div>
+      <div class="line"><span>Opening</span><span>${fmt(t.opening)}</span></div>
+      <div class="line"><span>Receipts</span><span class="amt-in" style="font-family:'IBM Plex Mono',monospace">${fmt(t.receipts)}</span></div>
+      <div class="line"><span>Payments</span><span class="amt-out" style="font-family:'IBM Plex Mono',monospace">${fmt(t.payments)}</span></div>
+      <div class="line"><strong>Book Closing</strong><strong style="font-family:'IBM Plex Mono',monospace">${fmt(t.closing)}</strong></div>
+      <div class="line"><span>Actual cash counted</span><input type="number" inputmode="decimal" class="actualInput" data-uid="${u.id}" value="${t.actual}" placeholder="0" ${state.day.closed?'disabled':''}></div>
+      <div class="line"><span>Difference</span>${diffHtml}</div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('.actualInput').forEach(inp=>{
+    inp.onchange = async (e)=>{ const uid=e.target.dataset.uid; state.day.balances[uid].actualCash = e.target.value==='' ? '' : Number(e.target.value); await saveDay(state.date, state.day); render(); };
+  });
+
+  const banner = document.getElementById('statusBanner');
+  if(anyMissing){
+    banner.innerHTML = `<div class="status-banner pending">Waiting on actual cash count from everyone</div>`;
+  } else if(allMatched){
+    banner.innerHTML = `<div class="status-banner ok">All matched ✓ — everyone's actual cash agrees with the books</div>`;
+  } else {
+    banner.innerHTML = `<div class="status-banner bad">Mismatch: ${mismatches.map(escapeHtml).join(', ')}</div>`;
+  }
+  document.getElementById('closedByNote').innerHTML = (state.day.closed && state.day.closedBy) ? `<div class="closed-by-note">Closed by ${escapeHtml(userById(state.day.closedBy).name)}</div>` : '';
+
+  document.getElementById('dashStrip').innerHTML = `
+    <div class="dash-card"><div class="dl">Combined Closing</div><div class="dv">${fmt(gt.closing)}</div></div>
+    <div class="dash-card"><div class="dl">${state.day.closed ? "Day Status" : "Entries Today"}</div><div class="dv">${state.day.closed ? "Closed" : state.day.entries.length}</div></div>
+  `;
+  const db = document.getElementById('dashBanner');
+  if(anyMissing){ db.innerHTML = `<div class="dash-banner pending">⏳ Waiting on actual cash count</div>`; }
+  else if(allMatched){ db.innerHTML = `<div class="dash-banner ok">✓ All matched — books and cash agree</div>`; }
+  else { db.innerHTML = `<div class="dash-banner bad">⚠ ${mismatches.map(escapeHtml).join(', ')}</div>`; }
+
+  const formArea = document.getElementById('formArea');
+  const lockedNote = document.getElementById('lockedNote');
+  if(state.day.closed){
+    formArea.innerHTML = `<div class="actions"><button onclick="reopenDay()">Reopen Day</button></div>`;
+    lockedNote.innerHTML = `<div class="locked-note">This day is closed. Reopen to edit entries.</div>`;
+  } else {
+    lockedNote.innerHTML = '';
+    formArea.innerHTML = `
+      <div class="addform">
+        <div class="addform-title">Add Entry — as ${escapeHtml(currentUser.name)}</div>
+        <div class="seg">
+          <button class="${state.form.type==='in'?'active in':''}" onclick="setType('in')">Cash In</button>
+          <button class="${state.form.type==='out'?'active out':''}" onclick="setType('out')">Cash Out</button>
+        </div>
+        <input type="text" id="particularsInput" placeholder="Particulars — what is this for?" value="${escapeHtml(state.form.particulars)}">
+        <div class="amtrow">
+          <input type="number" inputmode="decimal" id="amountInput" placeholder="Amount" value="${state.form.amount}">
+          <button class="star-toggle ${state.form.important?'on':''}" onclick="toggleImportant()" title="Mark important">★</button>
+        </div>
+        <button class="add-btn" onclick="addEntry()">Add to Cash Book</button>
+      </div>
+      <div class="actions"><button class="primary" onclick="closeDay()">Close Day &amp; Carry Forward</button></div>
+    `;
+    setTimeout(()=>{
+      const pi = document.getElementById('particularsInput'); const ai = document.getElementById('amountInput');
+      if(pi) pi.oninput = (e)=> state.form.particulars = e.target.value;
+      if(ai) ai.oninput = (e)=> state.form.amount = e.target.value;
+    },0);
+  }
+}
+
+function setType(t){ state.form.type = t; render(); }
+function toggleImportant(){ state.form.important = !state.form.important; render(); }
+
+async function addEntry(){
+  const p = state.form.particulars.trim(); const a = Number(state.form.amount);
+  if(!p || !a || a<=0){ showToast('Enter particulars and a valid amount'); return; }
+  const now = new Date(); const hh=String(now.getHours()).padStart(2,'0'); const mm=String(now.getMinutes()).padStart(2,'0');
+  state.day.entries.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), time: hh+':'+mm, particulars: p, amount: a, type: state.form.type, important: state.form.important, by: currentUser.id });
+  state.form = { type: state.form.type, particulars:'', amount:'', important:false };
+  const ok = await saveDay(state.date, state.day);
+  if(ok) showToast('Entry added');
+  render();
+}
+async function deleteEntry(id){ state.day.entries = state.day.entries.filter(e=>e.id!==id); await saveDay(state.date, state.day); render(); }
+
+async function closeDay(){
+  state.day.closed = true; state.day.closedBy = currentUser.id;
+  await saveDay(state.date, state.day);
+  for(const u of config.users){
+    const t = userTotals(state.day, u.id);
+    const carry = (t.actual !== '' && t.actual !== null && t.actual !== undefined) ? Number(t.actual) : t.closing;
+    state.meta.userCarry[u.id] = { date: state.date, balance: carry };
+  }
+  await saveMeta();
+  showToast('Day closed — each person\'s cash carried forward as tomorrow\'s opening');
+  render();
+}
+async function reopenDay(){ state.day.closed = false; await saveDay(state.date, state.day); showToast('Day reopened'); render(); }
+
+async function shiftDay(delta){
+  const d = new Date(state.date + 'T12:00:00'); d.setDate(d.getDate()+delta);
+  state.date = toISODate(d); state.day = await loadDay(state.date);
+  state.form = { type:'in', particulars:'', amount:'', important:false };
+  render();
+}
+
+/* ---------- HISTORY ---------- */
+async function openHistory(){
+  const list = document.getElementById('historyList');
+  const dates = [...state.meta.daysIndex].sort().reverse();
+  if(dates.length===0){ list.innerHTML = `<div class="empty-note">No days recorded yet.</div>`; }
+  else {
+    let rows = [];
+    for(const iso of dates){
+      const d0 = await safeGet('day:'+iso); if(!d0) continue;
+      const d = { ...d0, balances: d0.balances||{} };
+      for(const u of config.users){ if(!d.balances[u.id]) d.balances[u.id] = freshBalanceFor(u.id); }
+      const gt = dayGrandTotals(d); const pd = prettyDate(iso);
+      rows.push(`<div class="hist-row" onclick="jumpTo('${iso}')"><div><div class="d">${pd.main}</div><div class="s">${d.closed?'Closed':'Open'} · In ${fmt(gt.receipts)} · Out ${fmt(gt.payments)}</div></div><div class="c">${fmt(gt.closing)}</div></div>`);
+    }
+    list.innerHTML = rows.join('');
+  }
+  document.getElementById('historyOverlay').classList.remove('hidden');
+}
+function closeHistory(){ document.getElementById('historyOverlay').classList.add('hidden'); }
+async function jumpTo(iso){ state.date = iso; state.day = await loadDay(iso); closeHistory(); render(); }
+
+/* ---------- EXPORT ---------- */
+function openExport(){ document.getElementById('exportOverlay').classList.remove('hidden'); }
+function closeExport(){ document.getElementById('exportOverlay').classList.add('hidden'); }
+function csvCell(v){ const s = String(v==null?'':v); return '"' + s.replace(/"/g,'""') + '"'; }
+async function doExport(){
+  const dates = [...state.meta.daysIndex].sort();
+  if(dates.length===0){ showToast('No entries to export yet'); return; }
+  const rows = [['Date','Time','Entered By','Type','Particulars','Amount','Important','Person Opening','Person Book Closing','Person Actual Cash','Person Difference','Day Status']];
+  for(const iso of dates){
+    const d0 = await safeGet('day:'+iso); if(!d0) continue;
+    const d = { ...d0, balances: d0.balances||{} };
+    for(const u of config.users){ if(!d.balances[u.id]) d.balances[u.id] = freshBalanceFor(u.id); }
+    const perUser = {};
+    for(const u of config.users) perUser[u.id] = userTotals(d, u.id);
+    const byUsers = new Set();
+    for(const e of d.entries){
+      const u = userById(e.by); const t = perUser[e.by] || {};
+      const diff = (t.actual!=='' && t.actual!==null && t.actual!==undefined) ? (Number(t.actual)-t.closing) : '';
+      rows.push([iso, e.time||'', u.name, e.type==='in'?'Receipt':'Payment', e.particulars, e.amount, e.important?'Yes':'', t.opening, t.closing, t.actual===''?'':t.actual, diff===''?'':diff, d.closed?'Closed':'Open']);
+      byUsers.add(e.by);
+    }
+    for(const u of config.users){
+      if(byUsers.has(u.id)) continue;
+      const t = perUser[u.id];
+      const diff = (t.actual!=='' && t.actual!==null && t.actual!==undefined) ? (Number(t.actual)-t.closing) : '';
+      rows.push([iso, '', u.name, '', '(no entries)', '', '', t.opening, t.closing, t.actual===''?'':t.actual, diff===''?'':diff, d.closed?'Closed':'Open']);
+    }
+  }
+  const csv = rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'cash-book-export-' + toISODate(new Date()) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('CSV downloaded');
+}
+
+/* ---------- BOOT ---------- */
+async function enterApp(){
+  await loadMeta();
+  state.day = await loadDay(state.date);
+  document.getElementById('mainApp').style.display='block';
+  render();
+}
+async function init(){
+  await loadConfig();
+  if(!config || !config.users || config.users.length===0){
+    pendingSetupUsers = [];
+    renderSetupList();
+    document.getElementById('setupOverlay').classList.remove('hidden');
+  } else {
+    showLogin();
+  }
+}
+init();
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
