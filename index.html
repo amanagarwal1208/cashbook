@@ -11,6 +11,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Cash Book</title>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -266,23 +268,23 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script>
-  // ====== YOUR FIREBASE CONFIG (aman-cashbook) ======
-  const firebaseConfig = {
-    apiKey: "AIzaSyArnXm8lF2xcDmt9vkI9-JNk9eRBx_Ppjw",
-    authDomain: "aman-cashbook.firebaseapp.com",
-    projectId: "aman-cashbook",
-    storageBucket: "aman-cashbook.firebasestorage.app",
-    messagingSenderId: "1092214525446",
-    appId: "1:1092214525446:web:ffcb0f214fc580c987bd87"
-  };
-  // ====================================================
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-</script>
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-lite.js";
+
+// ====== YOUR FIREBASE CONFIG (aman-cashbook) ======
+const firebaseConfig = {
+  apiKey: "AIzaSyArnXm8lF2xcDmt9vkI9-JNk9eRBx_Ppjw",
+  authDomain: "aman-cashbook.firebaseapp.com",
+  projectId: "aman-cashbook",
+  storageBucket: "aman-cashbook.firebasestorage.app",
+  messagingSenderId: "1092214525446",
+  appId: "1:1092214525446:web:ffcb0f214fc580c987bd87"
+};
+// ====================================================
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
 const CUR = '₹';
 const PALETTE = ['#2f5fa1','#8a3fa0','#b5651d','#1f7a6c','#6b4fa0','#3a7a3a','#a05a2c','#4a5da3'];
 
@@ -308,14 +310,14 @@ function initials(name){ return (name||'?').trim().slice(0,1).toUpperCase(); }
 
 async function safeGet(key){
   try{
-    const doc = await db.collection('cashbook').doc(key).get();
-    if(!doc.exists) return null;
-    return doc.data().value;
+    const snap = await getDoc(doc(db, 'cashbook', key));
+    if(!snap.exists()) return null;
+    return snap.data().value;
   }catch(e){ console.error(e); showToast('Could not load — check connection'); return null; }
 }
 async function safeSet(key, value){
   try{
-    await db.collection('cashbook').doc(key).set({ value: value, updatedAt: Date.now() });
+    await setDoc(doc(db, 'cashbook', key), { value: value, updatedAt: Date.now() });
     return true;
   }catch(e){ console.error(e); showToast('Save failed — try again'); return false; }
 }
@@ -339,7 +341,16 @@ function pinClear(){ pinBuffer=''; renderPinDots(); }
 function renderPinDots(){ document.querySelectorAll('#pinDisplay .pin-dot').forEach((el,i)=> el.classList.toggle('filled', i < pinBuffer.length)); }
 async function tryPinLogin(){
   const match = config.users.find(u => u.pin === pinBuffer);
-  if(match){ currentUser = match; document.getElementById('loginOverlay').classList.add('hidden'); document.getElementById('loginError').textContent=''; pinBuffer=''; renderPinDots(); await enterApp(); }
+  if(match){
+    currentUser = match;
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginTitle').textContent = 'Loading your cash book…';
+    document.getElementById('keypad').style.opacity = '0.3';
+    document.getElementById('keypad').style.pointerEvents = 'none';
+    pinBuffer=''; renderPinDots();
+    await enterApp();
+    document.getElementById('loginOverlay').classList.add('hidden');
+  }
   else { document.getElementById('loginError').textContent = 'PIN not recognised — try again'; pinBuffer=''; renderPinDots(); }
 }
 
@@ -413,14 +424,33 @@ async function saveMeta(){ await safeSet('meta', state.meta); }
 
 function freshBalanceFor(userId){
   const carry = state.meta.userCarry[userId];
-  return carry ? { opening: carry.balance, openingManual: false, actualCash: '' } : { opening: 0, openingManual: true, actualCash: '' };
+  return carry ? { opening: carry.balance, openingManual: false, openingConfirmed: false, actualCash: '' } : { opening: 0, openingManual: true, openingConfirmed: false, actualCash: '' };
+}
+function balanceHasRealActivity(day, bal, userId){
+  if(!bal) return false;
+  const hasEntries = day.entries.some(e => e.by === userId);
+  const hasActual = bal.actualCash !== '' && bal.actualCash !== null && bal.actualCash !== undefined;
+  const openingWasConfirmed = bal.openingConfirmed === true;
+  return hasEntries || hasActual || openingWasConfirmed;
 }
 async function loadDay(iso){
   let day = await safeGet('day:'+iso);
   if(!day){ day = { balances: {}, entries: [], closed: false, closedBy: null }; }
   if(!day.balances) day.balances = {};
   if(day.closedBy === undefined) day.closedBy = null;
-  for(const u of config.users){ if(!day.balances[u.id]) day.balances[u.id] = freshBalanceFor(u.id); }
+  for(const u of config.users){
+    const existing = day.balances[u.id];
+    // If this day is still closed, trust whatever is stored — it's final.
+    // Otherwise, if nothing real has happened for this person yet (no entries,
+    // no actual count, no confirmed manual opening), always pull the latest
+    // carried-forward balance rather than trusting a possibly-stale placeholder
+    // record that was saved just from browsing to this date earlier.
+    if(!day.closed && !balanceHasRealActivity(day, existing, u.id)){
+      day.balances[u.id] = freshBalanceFor(u.id);
+    } else if(!existing){
+      day.balances[u.id] = freshBalanceFor(u.id);
+    }
+  }
   return day;
 }
 function ensureDayHasAllUsers(){
@@ -467,7 +497,7 @@ async function render(){
     </div>`;
   }).join('');
   document.querySelectorAll('.openInput').forEach(inp=>{
-    inp.onchange = async (e)=>{ const uid=e.target.dataset.uid; state.day.balances[uid].opening = Number(e.target.value)||0; await saveDay(state.date, state.day); render(); };
+    inp.onchange = async (e)=>{ const uid=e.target.dataset.uid; state.day.balances[uid].opening = Number(e.target.value)||0; state.day.balances[uid].openingConfirmed = true; await saveDay(state.date, state.day); render(); };
   });
 
   // entries
