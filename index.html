@@ -713,6 +713,32 @@ async function init(){
     showLogin();
   }
 }
+
+// Expose functions used by inline onclick handlers (needed since this is a module script)
+window.addEntry = addEntry;
+window.addPerson = addPerson;
+window.closeDay = closeDay;
+window.closeExport = closeExport;
+window.closeHistory = closeHistory;
+window.closeUsers = closeUsers;
+window.deleteEntry = deleteEntry;
+window.doExport = doExport;
+window.finishSetup = finishSetup;
+window.jumpTo = jumpTo;
+window.openExport = openExport;
+window.openHistory = openHistory;
+window.openUsers = openUsers;
+window.pinBack = pinBack;
+window.pinClear = pinClear;
+window.pinPress = pinPress;
+window.removePerson = removePerson;
+window.reopenDay = reopenDay;
+window.setType = setType;
+window.setupAddPerson = setupAddPerson;
+window.setupRemovePerson = setupRemovePerson;
+window.shiftDay = shiftDay;
+window.switchUser = switchUser;
+window.toggleImportant = toggleImportant;
 init();
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
