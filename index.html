@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Cash Book</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -87,6 +88,15 @@
   .entries{ padding: 6px 0 10px 0; }
   .entry{ display:flex; align-items:flex-start; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--rule); position: relative; }
   .entry.important{ background: var(--highlight-bg); box-shadow: inset 3px 0 0 var(--margin-rule); border-radius: 2px; }
+  .entry.contra{ background: rgba(90,110,160,0.10); }
+  .contra-tag{ display:inline-block; font-size:11px; font-weight:700; color:#4a5da3; background:rgba(90,110,160,0.16); border-radius:10px; padding:1px 7px; margin-right:4px; vertical-align:middle; }
+  .contra-toggle{ background:none; border:none; color:#4a5da3; font-family:'Inter'; font-size:13px; font-weight:600; cursor:pointer; padding:6px 0; text-decoration:underline; }
+  .contra-form{ background:#eef1f8; border:1px solid #cfd7ec; border-radius:14px; padding:14px; margin-top:10px; }
+  .contra-form .row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .contra-form select{ flex:1; font-family:'Inter'; font-size:14px; padding:9px; border:1px solid var(--rule); border-radius:5px; background:#fff; color:var(--ink); }
+  .contra-form input[type=text]{ width:100%; font-family:'Inter'; font-size:14px; padding:9px; border:1px solid var(--rule); border-radius:5px; margin-bottom:8px; background:#fff; }
+  .contra-form input[type=number]{ width:100%; font-family:'IBM Plex Mono',monospace; font-size:15px; padding:9px; border:1px solid var(--rule); border-radius:5px; margin-bottom:8px; background:#fff; }
+  .contra-arrow{ font-size:18px; color:#4a5da3; flex-shrink:0; }
   .entry .time{ font-family:'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); width: 40px; padding-top: 3px; flex-shrink:0; }
   .entry .by{ padding-top: 1px; flex-shrink:0; }
   .entry .particulars{ flex:1; font-size: 14.5px; line-height:1.4; padding-top: 1px; }
@@ -260,8 +270,8 @@
 <div class="overlay hidden" id="exportOverlay">
   <div class="sheet">
     <h2>Export Cash Book</h2>
-    <p class="sub">Downloads every entry from every day, with each person's opening, closing, actual count and difference, as a CSV that opens directly in Excel.</p>
-    <button class="add-btn" onclick="doExport()">Download CSV</button>
+    <p class="sub">Downloads every entry from every day, with each person's opening, closing, actual count and difference, as a ready-to-open Excel (.xlsx) file.</p>
+    <button class="add-btn" onclick="doExport()">Download Excel (.xlsx)</button>
     <button class="close-sheet" onclick="closeExport()">Close</button>
   </div>
 </div>
@@ -293,7 +303,7 @@ let currentUser = null;
 let pinBuffer = '';
 let pendingSetupUsers = [];
 
-let state = { date: toISODate(new Date()), day: null, meta: null, form: { type:'in', particulars:'', amount:'', important:false } };
+let state = { date: toISODate(new Date()), day: null, meta: null, form: { type:'in', particulars:'', amount:'', important:false }, contraOpen: false };
 
 function toISODate(d){ const off=d.getTimezoneOffset(); const local=new Date(d.getTime()-off*60000); return local.toISOString().slice(0,10); }
 function prettyDate(iso){
@@ -475,7 +485,12 @@ function dayGrandTotals(day){
     receipts+=t.receipts; payments+=t.payments; opening+=t.opening; closing+=t.closing;
     if(t.actual==='' || t.actual===null || t.actual===undefined) actualKnown=false; else actual+=Number(t.actual);
   }
-  return { receipts, payments, opening, closing, actual, actualKnown };
+  let extReceipts=0, extPayments=0;
+  for(const e of day.entries){
+    if(e.isContra) continue;
+    if(e.type==='in') extReceipts += Number(e.amount); else extPayments += Number(e.amount);
+  }
+  return { receipts, payments, opening, closing, actual, actualKnown, extReceipts, extPayments };
 }
 function userById(id){ return (config.users||[]).find(u=>u.id===id) || { name:'Unknown', color:'#999' }; }
 
@@ -507,20 +522,20 @@ async function render(){
   } else {
     list.innerHTML = state.day.entries.map(e => {
       const u = userById(e.by);
-      return `<div class="entry ${e.important?'important':''}">
+      return `<div class="entry ${e.important?'important':''} ${e.isContra?'contra':''}">
         <div class="time">${e.time||''}</div>
         <div class="by"><span class="badge" style="background:${u.color}" title="${escapeHtml(u.name)}">${initials(u.name)}</span></div>
-        <div class="particulars">${escapeHtml(e.particulars)}${e.important?' ★':''}</div>
+        <div class="particulars">${e.isContra?'<span class="contra-tag">&#8646; Contra</span> ':''}${escapeHtml(e.particulars)}${e.important?' &#9733;':''}</div>
         <div class="amt ${e.type==='in'?'receipt':'payment'}">${fmtSigned(e.amount, e.type)}</div>
-        ${state.day.closed ? '' : `<button class="del" onclick="deleteEntry('${e.id}')">✕</button>`}
+        ${state.day.closed ? '' : `<button class="del" onclick="deleteEntry('${e.id}')">&#10005;</button>`}
       </div>`;
     }).join('');
   }
 
   const gt = dayGrandTotals(state.day);
   document.getElementById('totalsBlock').innerHTML = `
-    <div class="line"><span>Total Receipts (everyone)</span><span class="amt-in">${fmt(gt.receipts)}</span></div>
-    <div class="line"><span>Total Payments (everyone)</span><span class="amt-out">${fmt(gt.payments)}</span></div>
+    <div class="line"><span>Total Receipts (everyone)</span><span class="amt-in">${fmt(gt.extReceipts)}</span></div>
+    <div class="line"><span>Total Payments (everyone)</span><span class="amt-out">${fmt(gt.extPayments)}</span></div>
     <div class="line strong"><span>Combined Book Closing</span><span class="amt">${fmt(gt.closing)}</span></div>
   `;
 
@@ -577,6 +592,7 @@ async function render(){
     lockedNote.innerHTML = `<div class="locked-note">This day is closed. Reopen to edit entries.</div>`;
   } else {
     lockedNote.innerHTML = '';
+    const otherUsersOptionsFor = (excludeId) => config.users.filter(u=>u.id!==excludeId).map(u=>`<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
     formArea.innerHTML = `
       <div class="addform">
         <div class="addform-title">Add Entry — as ${escapeHtml(currentUser.name)}</div>
@@ -591,14 +607,57 @@ async function render(){
         </div>
         <button class="add-btn" onclick="addEntry()">Add to Cash Book</button>
       </div>
+      ${config.users.length >= 2 ? `
+      <button class="contra-toggle" onclick="toggleContraForm()">${state.contraOpen ? '&#8722; Hide' : '&#8646; Add Contra / Transfer Entry'}</button>
+      ${state.contraOpen ? `
+      <div class="contra-form">
+        <div class="row">
+          <select id="contraFrom" onchange="contraFromChanged()">${otherUsersOptionsFor(null)}</select>
+          <span class="contra-arrow">&#8594;</span>
+          <select id="contraTo"></select>
+        </div>
+        <input type="text" id="contraParticulars" placeholder="Note (optional) — e.g. cash handed over">
+        <input type="number" inputmode="decimal" id="contraAmount" placeholder="Amount">
+        <button class="add-btn" onclick="addContraEntry()">Record Transfer</button>
+      </div>` : ''}` : ''}
       <div class="actions"><button class="primary" onclick="closeDay()">Close Day &amp; Carry Forward</button></div>
     `;
     setTimeout(()=>{
       const pi = document.getElementById('particularsInput'); const ai = document.getElementById('amountInput');
       if(pi) pi.oninput = (e)=> state.form.particulars = e.target.value;
       if(ai) ai.oninput = (e)=> state.form.amount = e.target.value;
+      const cf = document.getElementById('contraFrom');
+      if(cf){ cf.value = currentUser.id; contraFromChanged(); }
     },0);
   }
+}
+
+function toggleContraForm(){ state.contraOpen = !state.contraOpen; render(); }
+function contraFromChanged(){
+  const fromSel = document.getElementById('contraFrom');
+  const toSel = document.getElementById('contraTo');
+  if(!fromSel || !toSel) return;
+  const fromId = fromSel.value;
+  toSel.innerHTML = config.users.filter(u=>u.id!==fromId).map(u=>`<option value="${u.id}">${escapeHtml(u.name)}</option>`).join('');
+}
+async function addContraEntry(){
+  const fromId = document.getElementById('contraFrom').value;
+  const toId = document.getElementById('contraTo').value;
+  const amount = Number(document.getElementById('contraAmount').value);
+  const note = document.getElementById('contraParticulars').value.trim();
+  if(fromId === toId){ showToast('Pick two different people'); return; }
+  if(!amount || amount <= 0){ showToast('Enter a valid amount'); return; }
+  const fromName = userById(fromId).name, toName = userById(toId).name;
+  const now = new Date(); const hh=String(now.getHours()).padStart(2,'0'); const mm=String(now.getMinutes()).padStart(2,'0');
+  const contraId = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const noteOut = note || ('Cash transferred to ' + toName);
+  const noteIn = note || ('Cash received from ' + fromName);
+  state.day.entries.push({ id: contraId+'-out', time: hh+':'+mm, particulars: noteOut, amount, type:'out', important:false, by: fromId, isContra:true, contraId });
+  state.day.entries.push({ id: contraId+'-in', time: hh+':'+mm, particulars: noteIn, amount, type:'in', important:false, by: toId, isContra:true, contraId });
+  state.contraOpen = false;
+  const ok = await saveDay(state.date, state.day);
+  if(ok) showToast('Transfer recorded');
+  render();
 }
 
 function setType(t){ state.form.type = t; render(); }
@@ -614,7 +673,16 @@ async function addEntry(){
   if(ok) showToast('Entry added');
   render();
 }
-async function deleteEntry(id){ state.day.entries = state.day.entries.filter(e=>e.id!==id); await saveDay(state.date, state.day); render(); }
+async function deleteEntry(id){
+  const target = state.day.entries.find(e=>e.id===id);
+  if(target && target.isContra && target.contraId){
+    state.day.entries = state.day.entries.filter(e=>e.contraId !== target.contraId);
+  } else {
+    state.day.entries = state.day.entries.filter(e=>e.id!==id);
+  }
+  await saveDay(state.date, state.day);
+  render();
+}
 
 async function closeDay(){
   state.day.closed = true; state.day.closedBy = currentUser.id;
@@ -665,7 +733,7 @@ function csvCell(v){ const s = String(v==null?'':v); return '"' + s.replace(/"/g
 async function doExport(){
   const dates = [...state.meta.daysIndex].sort();
   if(dates.length===0){ showToast('No entries to export yet'); return; }
-  const rows = [['Date','Time','Entered By','Type','Particulars','Amount','Important','Person Opening','Person Book Closing','Person Actual Cash','Person Difference','Day Status']];
+  const rows = [['Date','Time','Entered By','Type','Particulars','Amount','Important','Contra','Person Opening','Person Book Closing','Person Actual Cash','Person Difference','Day Status']];
   for(const iso of dates){
     const d0 = await safeGet('day:'+iso); if(!d0) continue;
     const d = { ...d0, balances: d0.balances||{} };
@@ -676,23 +744,30 @@ async function doExport(){
     for(const e of d.entries){
       const u = userById(e.by); const t = perUser[e.by] || {};
       const diff = (t.actual!=='' && t.actual!==null && t.actual!==undefined) ? (Number(t.actual)-t.closing) : '';
-      rows.push([iso, e.time||'', u.name, e.type==='in'?'Receipt':'Payment', e.particulars, e.amount, e.important?'Yes':'', t.opening, t.closing, t.actual===''?'':t.actual, diff===''?'':diff, d.closed?'Closed':'Open']);
+      rows.push([iso, e.time||'', u.name, e.type==='in'?'Receipt':'Payment', e.particulars, e.amount, e.important?'Yes':'', e.isContra?'Yes':'', t.opening, t.closing, t.actual===''?'':t.actual, diff===''?'':diff, d.closed?'Closed':'Open']);
       byUsers.add(e.by);
     }
     for(const u of config.users){
       if(byUsers.has(u.id)) continue;
       const t = perUser[u.id];
       const diff = (t.actual!=='' && t.actual!==null && t.actual!==undefined) ? (Number(t.actual)-t.closing) : '';
-      rows.push([iso, '', u.name, '', '(no entries)', '', '', t.opening, t.closing, t.actual===''?'':t.actual, diff===''?'':diff, d.closed?'Closed':'Open']);
+      rows.push([iso, '', u.name, '', '(no entries)', '', '', '', t.opening, t.closing, t.actual===''?'':t.actual, diff===''?'':diff, d.closed?'Closed':'Open']);
     }
   }
-  const csv = rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'cash-book-export-' + toISODate(new Date()) + '.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try{
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = rows[0].map((_, colIdx) => {
+      const maxLen = rows.reduce((m, r) => Math.max(m, String(r[colIdx]==null?'':r[colIdx]).length), 8);
+      return { wch: Math.min(maxLen + 2, 30) };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cash Book');
+    XLSX.writeFile(wb, 'cash-book-export-' + toISODate(new Date()) + '.xlsx');
+  }catch(e){
+    console.error(e);
+    showToast('Excel export failed — try again');
+    return;
+  }
   showToast('CSV downloaded');
 }
 
@@ -739,6 +814,9 @@ window.setupRemovePerson = setupRemovePerson;
 window.shiftDay = shiftDay;
 window.switchUser = switchUser;
 window.toggleImportant = toggleImportant;
+window.toggleContraForm = toggleContraForm;
+window.contraFromChanged = contraFromChanged;
+window.addContraEntry = addContraEntry;
 init();
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
