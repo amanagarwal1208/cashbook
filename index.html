@@ -436,29 +436,32 @@ function freshBalanceFor(userId){
   const carry = state.meta.userCarry[userId];
   return carry ? { opening: carry.balance, openingManual: false, openingConfirmed: false, actualCash: '' } : { opening: 0, openingManual: true, openingConfirmed: false, actualCash: '' };
 }
-function balanceHasRealActivity(day, bal, userId){
-  if(!bal) return false;
-  const hasEntries = day.entries.some(e => e.by === userId);
-  const hasActual = bal.actualCash !== '' && bal.actualCash !== null && bal.actualCash !== undefined;
-  const openingWasConfirmed = bal.openingConfirmed === true;
-  return hasEntries || hasActual || openingWasConfirmed;
-}
 async function loadDay(iso){
   let day = await safeGet('day:'+iso);
   if(!day){ day = { balances: {}, entries: [], closed: false, closedBy: null }; }
   if(!day.balances) day.balances = {};
   if(day.closedBy === undefined) day.closedBy = null;
   for(const u of config.users){
-    const existing = day.balances[u.id];
-    // If this day is still closed, trust whatever is stored — it's final.
-    // Otherwise, if nothing real has happened for this person yet (no entries,
-    // no actual count, no confirmed manual opening), always pull the latest
-    // carried-forward balance rather than trusting a possibly-stale placeholder
-    // record that was saved just from browsing to this date earlier.
-    if(!day.closed && !balanceHasRealActivity(day, existing, u.id)){
+    let bal = day.balances[u.id];
+    if(!bal){
       day.balances[u.id] = freshBalanceFor(u.id);
-    } else if(!existing){
-      day.balances[u.id] = freshBalanceFor(u.id);
+      continue;
+    }
+    // The opening balance and everything else (entries, actual cash count) are
+    // independent of each other. Entries existing on a day does NOT mean the
+    // opening was correct — it may have been created before an earlier day got
+    // closed. So: as long as this day isn't closed and its opening was never
+    // manually confirmed by the person, always re-sync the opening to the
+    // latest carried-forward figure. This never touches entries or the actual
+    // cash count already entered — it only corrects the starting baseline,
+    // and the closing balance recalculates from it automatically.
+    if(!day.closed && bal.openingConfirmed !== true){
+      const carry = state.meta.userCarry[u.id];
+      const correctOpening = carry ? carry.balance : 0;
+      if(bal.opening !== correctOpening){
+        bal.opening = correctOpening;
+        bal.openingManual = !carry;
+      }
     }
   }
   return day;
