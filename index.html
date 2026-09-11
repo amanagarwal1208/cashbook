@@ -447,20 +447,22 @@ async function loadDay(iso){
       day.balances[u.id] = freshBalanceFor(u.id);
       continue;
     }
-    // The opening balance and everything else (entries, actual cash count) are
-    // independent of each other. Entries existing on a day does NOT mean the
-    // opening was correct — it may have been created before an earlier day got
-    // closed. So: as long as this day isn't closed and its opening was never
-    // manually confirmed by the person, always re-sync the opening to the
-    // latest carried-forward figure. This never touches entries or the actual
-    // cash count already entered — it only corrects the starting baseline,
-    // and the closing balance recalculates from it automatically.
-    if(!day.closed && bal.openingConfirmed !== true){
+    // Opening balance is never something to manually edit once this person has
+    // ever closed a day before — it always, unconditionally, tracks the latest
+    // carried-forward figure for as long as this day itself isn't closed.
+    // This is what makes retroactive corrections work correctly: if someone
+    // goes back and fixes an earlier day (adds a forgotten entry, corrects
+    // their actual count, then re-closes it), every later still-open day for
+    // that same person re-syncs to the corrected figure the next time it's
+    // loaded — while their own entries on those later days are never touched,
+    // only the baseline they're calculated against.
+    // Manual opening entry only ever applies to a person's very first day,
+    // before any carry-forward exists for them at all.
+    if(!day.closed){
       const carry = state.meta.userCarry[u.id];
-      const correctOpening = carry ? carry.balance : 0;
-      if(bal.opening !== correctOpening){
-        bal.opening = correctOpening;
-        bal.openingManual = !carry;
+      if(carry){
+        bal.opening = carry.balance;
+        bal.openingManual = false;
       }
     }
   }
@@ -507,15 +509,15 @@ async function render(){
   const openingsList = document.getElementById('openingsList');
   openingsList.innerHTML = config.users.map(u=>{
     const bal = state.day.balances[u.id];
-    const entryCount = state.day.entries.filter(e=>e.by===u.id).length;
-    const editable = bal.openingManual && entryCount===0 && !state.day.closed;
+    const hasEverClosedBefore = !!state.meta.userCarry[u.id];
+    const editable = !hasEverClosedBefore && !state.day.closed;
     return `<div class="open-row">
       <div class="who"><span class="badge" style="background:${u.color}">${initials(u.name)}</span>${escapeHtml(u.name)}</div>
       ${editable ? `<input type="number" inputmode="decimal" class="openInput" data-uid="${u.id}" value="${bal.opening||''}" placeholder="0">` : `<span class="amt">${fmt(bal.opening)}</span>`}
     </div>`;
   }).join('');
   document.querySelectorAll('.openInput').forEach(inp=>{
-    inp.onchange = async (e)=>{ const uid=e.target.dataset.uid; state.day.balances[uid].opening = Number(e.target.value)||0; state.day.balances[uid].openingConfirmed = true; await saveDay(state.date, state.day); render(); };
+    inp.onchange = async (e)=>{ const uid=e.target.dataset.uid; state.day.balances[uid].opening = Number(e.target.value)||0; await saveDay(state.date, state.day); render(); };
   });
 
   // entries
